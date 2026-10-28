@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShopSmart Console</title>
+<link rel="stylesheet" href="/static/store.css">
+</head>
+<body>
+<header><strong>ShopSmart</strong> &middot; demo console</header>
+
+<section class="card">
+  <h2>Sign in</h2>
+  <input id="email" placeholder="email" value="alice.nguyen@example.com">
+  <input id="password" type="password" placeholder="password" value="shopsmart-demo">
+  <button onclick="login()">Sign in</button>
+  <span id="who"></span>
+</section>
+
+<section class="card">
+  <h2>Support chat</h2>
+  <textarea id="chat" rows="2" placeholder="Where is my order 1002?"></textarea>
+  <button onclick="chat()">Send</button>
+  <pre id="chatOut"></pre>
+</section>
+
+<section class="card">
+  <h2>Ask the store</h2>
+  <input id="ask" placeholder="What is the return policy for sleeping bags?">
+  <button onclick="ask()">Ask</button>
+  <pre id="askOut"></pre>
+</section>
+
+<section class="card">
+  <h2>Merchant analytics</h2>
+  <input id="q" placeholder="What were my top 3 products by revenue last month?">
+  <button onclick="analytics()">Run</button>
+  <pre id="qOut"></pre>
+</section>
+
+<p>Product pages: <a href="/storefront/northwind/products/100">Ridgeline tent</a> &middot;
+<a href="/storefront/lumen/products/200">Arc lamp</a> &middot; <a href="/docs">API docs</a></p>
+
+<script>
+let token = null, sessionId = null;
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json();
+}
+async function login() {
+  const r = await api("/auth/login", { email: email.value, password: password.value });
+  token = r.access_token; who.textContent = token ? ` signed in as ${r.role}` : " login failed";
+}
+async function chat() {
+  const r = await api("/support/chat", { message: document.getElementById("chat").value, session_id: sessionId });
+  sessionId = r.session_id; chatOut.textContent += `you: ${document.getElementById("chat").value}\nsky: ${r.reply}\n\n`;
+}
+async function ask() { askOut.textContent = JSON.stringify(await api("/search/ask", { question: document.getElementById("ask").value }), null, 2); }
+async function analytics() { qOut.textContent = JSON.stringify(await api("/merchant/analytics/ask", { question: q.value }), null, 2); }
+</script>
+</body>
+</html>

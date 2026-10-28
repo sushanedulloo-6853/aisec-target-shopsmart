@@ -1,0 +1,28 @@
+[project]
+name = "shopsmart"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "chromadb",
+    "fastapi>=0.165.0",
+    "jinja2>=3.1.6",
+    "langchain-chroma>=1.2.0",
+    "langchain-core>=1.8.4",
+    "langchain-openai>=1.8.5",
+    "langgraph>=1.2.24",
+    "openai>=3.59.0",
+    "pyjwt>=2.15.1",
+    "sqlalchemy>=2.1.9",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+data/shopsmart.db
+data/chroma/
+logs/
+.DS_Store
+.pytest_cache/

@@ -1,0 +1,9 @@
+body { font-family: system-ui, sans-serif; max-width: 860px; margin: 0 auto; padding: 16px; color: #1d2330; background: #fafafa; }
+header { padding: 8px 0; border-bottom: 1px solid #ddd; margin-bottom: 16px; }
+.price { font-size: 1.4rem; font-weight: 600; }
+.ai-summary { background: #eef5ff; border-radius: 8px; padding: 12px 16px; }
+.review { border-bottom: 1px solid #eee; padding: 8px 0; }
+textarea, input, select { width: 100%; box-sizing: border-box; padding: 8px; margin: 4px 0; }
+button { padding: 8px 14px; }
+pre { background: #fff; border: 1px solid #ddd; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+section.card { background: #fff; border: 1px solid #e3e3e3; border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
