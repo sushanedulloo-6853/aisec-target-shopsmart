@@ -1,5 +1,6 @@
 import os
 import tempfile
+import uuid
 
 _tmp = tempfile.mkdtemp(prefix="shopsmart-tests-")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
@@ -8,8 +9,12 @@ os.environ["CHROMA_DIR"] = f"{_tmp}/chroma"
 os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef0123456789"
 os.environ.pop("OPENAI_API_KEY", None)
 
+import chromadb  # noqa: E402
 import pytest  # noqa: E402
+from chromadb.config import Settings as ChromaSettings  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from langchain_chroma import Chroma  # noqa: E402
+from langchain_core.embeddings import DeterministicFakeEmbedding  # noqa: E402
 from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E402
 from langchain_core.messages import AIMessage  # noqa: E402
 from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
@@ -19,6 +24,7 @@ from shopsmart.auth import create_access_token, login_limiter  # noqa: E402
 from shopsmart.db import Base, SessionLocal, get_engine  # noqa: E402
 from shopsmart.models import User  # noqa: E402
 from shopsmart.seed import seed  # noqa: E402
+from shopsmart.services.search import vectorstore  # noqa: E402
 
 
 class ScriptedChatModel(BaseChatModel):
@@ -83,6 +89,19 @@ def auth(token):
         return {"Authorization": f"Bearer {token(user_id)}"}
 
     return headers
+
+
+@pytest.fixture
+def fake_vectorstore():
+    client = chromadb.EphemeralClient(settings=ChromaSettings(anonymized_telemetry=False))
+    store = Chroma(
+        client=client,
+        collection_name=f"test-{uuid.uuid4().hex[:8]}",
+        embedding_function=DeterministicFakeEmbedding(size=64),
+    )
+    vectorstore.set_vectorstore(store)
+    yield store
+    vectorstore.set_vectorstore(None)
 
 
 @pytest.fixture
