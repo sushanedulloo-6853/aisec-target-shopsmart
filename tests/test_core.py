@@ -40,6 +40,7 @@ def test_login_is_rate_limited(client):
 
 def test_protected_routes_need_token(client):
     assert client.get("/orders").status_code == 401
+    assert client.post("/support/chat", json={"message": "hi"}).status_code == 401
 
 
 def test_customer_sees_only_own_orders(client, auth):

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from shopsmart.config import BASE_DIR, get_settings
 from shopsmart.db import Base, SessionLocal, get_engine
 from shopsmart.models import Merchant
-from shopsmart.routers import admin, auth, catalog, orders, search
+from shopsmart.routers import admin, auth, catalog, orders, search, support
 from shopsmart.seed import seed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -34,7 +34,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="ShopSmart API", version="0.4.0", lifespan=lifespan)
 
-for module in (auth, catalog, orders, search, admin):
+for module in (auth, catalog, orders, support, search, admin):
     app.include_router(module.router)
 
 if STATIC_DIR.exists():
