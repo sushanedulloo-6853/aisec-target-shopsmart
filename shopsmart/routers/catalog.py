@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from shopsmart.auth import Principal, require_role
 from shopsmart.db import get_db
 from shopsmart.models import Merchant, Product, Review
+from shopsmart.services.reviews.summarizer import summarize_reviews
 
 router = APIRouter(tags=["catalog"])
 
@@ -80,8 +81,18 @@ def create_review(
         raise HTTPException(404, "Product not found")
     row = Review(product_id=product.id, customer_id=principal.user_id, **review.model_dump())
     db.add(row)
+    product.review_summary = None  # regenerate on next view
     db.commit()
     return {"id": row.id}
+
+
+@router.get("/products/{product_id}/reviews/summary")
+def review_summary(product_id: int, db: Session = Depends(get_db)) -> dict:
+    product = _get_product(db, product_id)
+    summary = product.review_summary
+    if summary is None and product.reviews:
+        summary = summarize_reviews(db, product)
+    return {"product_id": product.id, "summary_html": summary or ""}
 
 
 PAGE = """<!doctype html>
@@ -97,6 +108,10 @@ PAGE = """<!doctype html>
   <h1>{title}</h1>
   <p class="price">${price}</p>
   <p class="description">{description}</p>
+  <section class="ai-summary">
+    <h2>What customers say</h2>
+    {summary}
+  </section>
   <section class="reviews">
     <h2>Reviews ({count})</h2>
     {reviews}
@@ -111,6 +126,9 @@ def product_page(slug: str, product_id: int, db: Session = Depends(get_db)) -> H
     product = _get_product(db, product_id)
     if product.merchant.slug != slug:
         raise HTTPException(404, "Product not found")
+    summary = product.review_summary
+    if summary is None and product.reviews:
+        summary = summarize_reviews(db, product)
     reviews_html = "\n".join(
         f'<article class="review"><h3>{escape(r.title)} <span>{r.rating}/5</span></h3>'
         f"<p>{escape(r.body)}</p><footer>{escape(r.customer.first_name)}</footer></article>"
@@ -122,6 +140,7 @@ def product_page(slug: str, product_id: int, db: Session = Depends(get_db)) -> H
         slug=escape(slug),
         price=f"{product.price_cents / 100:.2f}",
         description=escape(product.description),
+        summary=summary or "<p>No reviews yet.</p>",
         count=len(product.reviews),
         reviews=reviews_html,
     )
