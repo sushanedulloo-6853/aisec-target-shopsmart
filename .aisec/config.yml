@@ -1,0 +1,116 @@
+version: 1
+app:
+  root: .
+  language: python
+  build:
+    dockerfile: Dockerfile
+    install: ["uv sync --frozen"]
+  start:
+    command: "uvicorn shopsmart.main:app --host 0.0.0.0 --port 8000"
+    port: 8000
+    env:
+      APP_ENV: test
+      DATABASE_URL: "sqlite:///data/shopsmart.db"
+      CHROMA_DIR: "data/chroma"
+      LOG_DIR: "logs"
+  health: { path: /healthz, expectStatus: 200, timeoutS: 120 }
+  isolation: reuse
+
+# Primary conversational surface: customer support assistant (LangGraph multi-agent).
+interface:
+  type: http
+  http:
+    method: POST
+    path: /support/chat
+    body: { message: "{{input}}", session_id: "{{session}}" }
+    response:
+      text: "$.reply"
+  # Every AI service in the product. All require a bearer token (see identity).
+  services:
+    - name: support-chatbot
+      description: LangGraph router + orders/returns/products agents with order, refund, address and email tools
+      method: POST
+      path: /support/chat
+      role: customer
+      body: { message: "{{input}}", session_id: "{{session}}" }
+      response: { text: "$.reply" }
+    - name: store-qa-rag
+      description: RAG answers over merchant policy documents in Chroma
+      method: POST
+      path: /search/ask
+      role: customer
+      body: { question: "{{input}}" }
+      response: { text: "$.answer" }
+    - name: product-search
+      description: semantic product search over the catalog (vector store)
+      method: POST
+      path: /search/products
+      role: customer
+      body: { query: "{{input}}" }
+      response: { text: "$.results" }
+    - name: policy-doc-ingestion
+      description: merchant uploads policy docs that are embedded into the RAG corpus
+      method: POST
+      path: /merchant/docs
+      role: merchant
+      body: { title: "Uploaded policy", content: "{{input}}", visibility: "public" }
+      response: { text: "$" }
+    - name: review-summarizer
+      description: write a review (UGC) then fetch the AI summary rendered into the product page
+      inject:
+        method: POST
+        path: /products/{{product_id}}/reviews
+        role: customer
+        body: { rating: 4, title: "Review", body: "{{input}}" }
+      method: GET
+      path: /storefront/northwind/products/{{product_id}}
+      params: { product_id: 105 }
+      response: { text: body, html: body }
+    - name: review-summary-json
+      method: GET
+      path: /products/{{product_id}}/reviews/summary
+      params: { product_id: 105 }
+      response: { text: "$.summary_html", html: "$.summary_html" }
+    - name: analytics-copilot
+      description: natural language -> SQL over the store database
+      method: POST
+      path: /merchant/analytics/ask
+      role: merchant
+      body: { question: "{{input}}" }
+      response: { text: "$.answer" }
+    - name: campaign-email-generator
+      description: batch generation of personalised marketing emails for a customer segment
+      method: POST
+      path: /merchant/campaigns/generate
+      role: merchant
+      body: { name: "Scanner campaign", brief: "{{input}}", segment: {}, variants: 1, send: false }
+      response: { text: "$.emails[*].body_html", html: "$.emails[*].body_html" }
+
+identity:
+  mode: bearer-jwt
+  bearer-jwt: { secretEnv: JWT_SECRET, claims: { sub: "{{identity.id}}" }, alg: HS256 }
+  # Alternative: obtain a real token by logging in.
+  login:
+    method: POST
+    path: /auth/login
+    body: { email: "{{identity.email}}", password: "{{identity.password}}" }
+    token: "$.access_token"
+  users:
+    - { id: "10", email: alice.nguyen@example.com, password: shopsmart-demo, role: customer, tenant: northwind }
+    - { id: "20", email: erin.walsh@example.net, password: shopsmart-demo, role: customer, tenant: lumen }
+    - { id: "2", email: owner@northwind.example, password: shopsmart-demo, role: merchant, tenant: northwind }
+    - { id: "3", email: owner@lumenhome.example, password: shopsmart-demo, role: merchant, tenant: lumen }
+    - { id: "1", email: admin@shopsmart.example, password: shopsmart-demo, role: admin, tenant: null }
+
+fixtures:
+  seedCommand: "python -m shopsmart.seed"
+  corpusDir: data/policies
+  ingestCommand: "python -m shopsmart.services.search.ingest"
+
+fakes:
+  http:
+    - host: api.shipfast.example
+      routes: [{ method: GET, path: /v2/track/*, status: 200, body: { status: "in_transit" } }]
+
+providers: [openai]
+budget: { usd: 3 }
