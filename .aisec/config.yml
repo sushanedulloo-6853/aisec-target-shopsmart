@@ -85,6 +85,13 @@ interface:
       role: merchant
       body: { name: "Scanner campaign", brief: "{{input}}", segment: {}, variants: 1, send: false }
       response: { text: "$.emails[*].body_html", html: "$.emails[*].body_html" }
+    - name: catalog-import
+      description: fetches a supplier product page by URL and extracts a listing with the LLM
+      method: POST
+      path: /merchant/products/import
+      role: merchant
+      body: { url: "{{input}}" }
+      response: { text: "$.description" }
 
 identity:
   mode: bearer-jwt

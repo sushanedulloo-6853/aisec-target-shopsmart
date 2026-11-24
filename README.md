@@ -4,7 +4,7 @@
 
 ShopSmart is a multi-tenant e-commerce backend: each merchant runs a storefront on the platform, and
 customers belong to one merchant's store. On top of the usual catalog / orders / reviews API, the platform
-ships five AI services that share one FastAPI backend, one SQLite database and one JWT auth model.
+ships six AI services that share one FastAPI backend, one SQLite database and one JWT auth model.
 
 All people, emails, phone numbers, addresses, card digits and keys in this repo are synthetic.
 
@@ -17,6 +17,7 @@ All people, emails, phone numbers, addresses, card digits and keys in this repo 
 | 3 | **Review summarizer** — "What customers say" box built from customer reviews and rendered on the product page | `GET /storefront/{slug}/products/{id}`, `GET /products/{id}/reviews/summary` | langchain-openai |
 | 4 | **Merchant analytics copilot** — ask questions in plain English, get SQL + rows + a short answer | `POST /merchant/analytics/ask` | OpenAI Responses API |
 | 5 | **Campaign email generator** — writes a personalised email for each customer in a segment | `POST /merchant/campaigns/generate` | OpenAI Chat Completions |
+| 6 | **Catalog import assistant** — paste a supplier product URL, get a ready-to-sell listing | `POST /merchant/products/import` | OpenAI Responses API + httpx |
 
 Models: `gpt-6-luna` for all generation (`OPENAI_MODEL`), `text-embedding-3-large` for embeddings
 (`OPENAI_EMBEDDING_MODEL`). `OPENAI_BASE_URL` is honoured by every client.
@@ -58,10 +59,12 @@ flowchart LR
     CAT --> SUM[review summarizer]
     ANA --> SQL[NL to SQL] --> DB
     MKT --> GEN[email generator] --> MAIL
+    IMP[/merchant/products/import/] --> IMPORTER[catalog importer] --> WEB((supplier web pages))
+    IMPORTER --> DB
 
     DB[(SQLite<br/>merchants, users, products,<br/>orders, reviews, refunds,<br/>policy_docs, campaigns, outbox)]
 
-    R & OA & RA & PA & SUM & SQL & GEN & VS -.->|OPENAI_BASE_URL| OAI[(OpenAI API<br/>gpt-6-luna / text-embedding-3-large)]
+    R & OA & RA & PA & SUM & SQL & GEN & IMPORTER & VS -.->|OPENAI_BASE_URL| OAI[(OpenAI API<br/>gpt-6-luna / text-embedding-3-large)]
 ```
 
 ## Running
@@ -124,6 +127,7 @@ shopsmart/
   services/reviews/    review summarizer
   services/analytics/  NL->SQL copilot + saved reports
   services/marketing/  campaign email generator
+  services/catalog_import/  URL -> product listing importer
 data/policies/         merchant policy docs (seeded into DB + vector store)
 static/                tiny demo console
 .aisec/config.yml      scanner run profile
