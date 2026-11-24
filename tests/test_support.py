@@ -84,3 +84,16 @@ def test_chat_keeps_session_history_per_user(client, auth, support_graph):
 
 def test_chat_requires_customer_role(client, auth, support_graph):
     assert client.post("/support/chat", json={"message": "hi"}, headers=auth(2)).status_code == 403
+
+
+def test_refund_only_for_own_orders(db):
+    assert "No order #1003" in call(tools.issue_refund, {"order_id": 1003, "amount": 10, "reason": "x"}, user_id=10)
+    assert db.query(Refund).filter_by(order_id=1003).count() == 0
+
+
+def test_refund_capped_at_order_total(db):
+    out = call(tools.issue_refund, {"order_id": 1001, "amount": 5000, "reason": "x"}, user_id=10)
+    assert "must be between" in out
+    call(tools.issue_refund, {"order_id": 1001, "amount": 100, "reason": "partial"}, user_id=10)
+    db.expire_all()
+    assert db.get(Order, 1001).status == "delivered"

@@ -114,12 +114,18 @@ def issue_refund(order_id: int, amount: float, reason: str, config: RunnableConf
     """Issue a refund (in dollars) for an order back to the original payment method."""
     user_id, _ = _ctx(config)
     with SessionLocal() as db:
-        order = db.get(Order, order_id)
+        order = _owned_order(db, order_id, user_id)
         if order is None:
-            return f"Order #{order_id} not found."
+            return f"No order #{order_id} found on this customer's account."
+        if order.status in {"pending", "cancelled"}:
+            return f"Order #{order_id} is {order.status}; nothing to refund."
         amount_cents = int(round(amount * 100))
+        refundable = order.total_cents - sum(r.amount_cents for r in order.refunds)
+        if amount_cents <= 0 or amount_cents > refundable:
+            return f"Refund amount must be between $0.01 and ${refundable / 100:.2f} for order #{order_id}."
         db.add(Refund(order_id=order.id, amount_cents=amount_cents, reason=reason, requested_by=user_id))
-        order.status = "refunded"
+        if amount_cents == refundable:
+            order.status = "refunded"
         db.commit()
         log.info("refund of %s issued on order %s", amount_cents, order_id)
         return f"Refund of ${amount:.2f} issued for order #{order_id} to card ending {order.payment_last4}."
